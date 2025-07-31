@@ -59,7 +59,8 @@
 
         #grid {
             display: grid;
-            gap: 2px;
+            /* Reduced gap to 0 for crisp borders */
+            gap: 0;
             margin-bottom: 1rem;
             user-select: none;
         }
@@ -74,7 +75,9 @@
             font-size: 24px;
             cursor: pointer;
             transition: background-color 0.3s, border 0.3s;
-            border: 2px solid transparent;
+            box-sizing: border-box;
+            /* Consistent baseline border */
+            border: 1px solid black;
         }
 
         .cell.invalid {
@@ -147,14 +150,13 @@
             let gridSize = 8;
             let currentRegionId = 1;
             let isPlayMode = false;
-            let puzzleGrid = []; // Holds region IDs or 0 for unassigned
-            let boardState = []; // '', 'X', or 'P' per cell in play mode
+            let puzzleGrid = [];
+            let boardState = [];
 
-            // Color mapping cache: regionId => color string
             const regionColors = new Map();
 
             function getColorForRegion(id) {
-                if (id === 0) return '#222'; // unassigned default dark
+                if (id === 0) return '#222';
                 if (!regionColors.has(id)) {
                     const goldenAngle = 137.508;
                     const hue = (id * goldenAngle) % 360;
@@ -200,7 +202,23 @@
                             cell.style.border = '1px solid black';
                         } else {
                             cell.style.backgroundColor = getColorForRegion(puzzleGrid[r][c]);
-                            cell.style.border = '2px solid transparent';
+
+                            let borderTop = '1px';
+                            let borderRight = '1px';
+                            let borderBottom = '1px';
+                            let borderLeft = '1px';
+
+                            const region = puzzleGrid[r][c];
+                            if (r === 0 || puzzleGrid[r - 1][c] !== region) borderTop = '3px';
+                            if (c === gridSize - 1 || puzzleGrid[r][c + 1] !== region) borderRight = '3px';
+                            if (r === gridSize - 1 || puzzleGrid[r + 1][c] !== region) borderBottom = '3px';
+                            if (c === 0 || puzzleGrid[r][c - 1] !== region) borderLeft = '3px';
+
+                            cell.style.border = '';
+                            cell.style.borderTop = `${borderTop} solid black`;
+                            cell.style.borderRight = `${borderRight} solid black`;
+                            cell.style.borderBottom = `${borderBottom} solid black`;
+                            cell.style.borderLeft = `${borderLeft} solid black`;
                         }
 
                         if (isPlayMode) {
@@ -254,13 +272,7 @@
                 renderGrid();
             }
 
-            // Validations for play mode:
-            // 1. No pumpkins (P) in same row
-            // 2. No pumpkins in same col
-            // 3. No pumpkins in same region (puzzleGrid)
-            // 4. No pumpkins adjacent (8 neighbors)
             function validateBoard() {
-                // Clear invalids first
                 document.querySelectorAll('.cell').forEach(c => c.classList.remove('invalid'));
 
                 for (let r = 0; r < gridSize; r++) {
@@ -269,13 +281,11 @@
                             const region = puzzleGrid[r][c];
                             const cellEl = document.querySelector(`.cell[data-r='${r}'][data-c='${c}']`);
 
-                            // Row and Col check
                             for (let i = 0; i < gridSize; i++) {
                                 if (i !== c && boardState[r][i] === 'P') cellEl.classList.add('invalid');
                                 if (i !== r && boardState[i][c] === 'P') cellEl.classList.add('invalid');
                             }
 
-                            // Region check
                             for (let rr = 0; rr < gridSize; rr++) {
                                 for (let cc = 0; cc < gridSize; cc++) {
                                     if ((rr !== r || cc !== c) && boardState[rr][cc] === 'P' && puzzleGrid[rr][cc] === region) {
@@ -284,7 +294,6 @@
                                 }
                             }
 
-                            // Adjacent 8 neighbors
                             for (let dr = -1; dr <= 1; dr++) {
                                 for (let dc = -1; dc <= 1; dc++) {
                                     if (dr === 0 && dc === 0) continue;
@@ -300,12 +309,10 @@
                 }
             }
 
-            // Export puzzleGrid as JSON string
             function exportPuzzle() {
                 return JSON.stringify({ gridSize, puzzleGrid });
             }
 
-            // Import puzzle JSON string
             function importPuzzle(jsonStr) {
                 try {
                     const obj = JSON.parse(jsonStr);
@@ -327,7 +334,6 @@
                 }
             }
 
-            // Event listeners
             gridSizeInput.addEventListener('change', () => {
                 const val = +gridSizeInput.value;
                 if (val >= 4 && val <= 20) {
@@ -375,7 +381,6 @@
                 if (json) importPuzzle(json);
             });
 
-            // Initialize
             initGrid();
 
         })();
