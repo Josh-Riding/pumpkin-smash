@@ -189,10 +189,20 @@
                         cell.dataset.r = r;
                         cell.dataset.c = c;
 
-                        // background color from region
-                        cell.style.backgroundColor = getColorForRegion(puzzleGrid[r][c]);
+                        if (!isPlayMode) {
+                            const baseColor = 'white';
+                            const regionId = puzzleGrid[r][c];
+                            let overlayColor = 'transparent';
+                            if (regionId > 0) {
+                                overlayColor = getColorForRegion(regionId).replace('hsl', 'hsla').replace(')', ', 0.35)');
+                            }
+                            cell.style.background = `linear-gradient(${overlayColor}, ${overlayColor}), ${baseColor}`;
+                            cell.style.border = '1px solid black';
+                        } else {
+                            cell.style.backgroundColor = getColorForRegion(puzzleGrid[r][c]);
+                            cell.style.border = '2px solid transparent';
+                        }
 
-                        // show piece in play mode
                         if (isPlayMode) {
                             if (boardState[r][c] === 'X') {
                                 cell.textContent = 'X';
