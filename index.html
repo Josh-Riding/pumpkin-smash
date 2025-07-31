@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pumpkin Graveyard Creator & Player</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            background: #1b1b1b;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 1rem;
+        }
+
+        h1 {
+            margin-bottom: 0.3em;
+        }
+
+        #controls {
+            margin-bottom: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        label {
+            display: flex;
+            flex-direction: column;
+            font-size: 0.9rem;
+        }
+
+        input[type=number] {
+            width: 4rem;
+            font-size: 1rem;
+            text-align: center;
+            margin-top: 0.2rem;
+        }
+
+        button {
+            background: #f07c00;
+            border: none;
+            padding: 0.4em 1em;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        button:disabled {
+            background: #555;
+            cursor: default;
+        }
+
+        #grid {
+            display: grid;
+            gap: 2px;
+            margin-bottom: 1rem;
+            user-select: none;
+        }
+
+        .cell {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            cursor: pointer;
+            transition: background-color 0.3s, border 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .cell.invalid {
+            border-color: #f44336;
+            animation: pulse 1s infinite;
+        }
+
+        .cell.X {
+            background: #444;
+            color: #bbb;
+        }
+
+        .cell.P {
+            background: orange;
+            color: black;
+            font-weight: bold;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                border-color: #f44336;
+            }
+
+            50% {
+                border-color: #ff7961;
+            }
+        }
+
+        textarea {
+            width: 90vw;
+            max-width: 600px;
+            height: 6em;
+            background: #222;
+            color: #eee;
+            border: none;
+            border-radius: 6px;
+            padding: 0.5em;
+            font-family: monospace;
+            resize: vertical;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🎃 Pumpkin Graveyard Creator & Player</h1>
+
+    <div id="controls">
+        <label>
+            Grid Size (N×N)
+            <input id="gridSize" type="number" min="4" max="20" value="8" />
+        </label>
+        <label>
+            Current Region ID
+            <input id="regionId" type="number" min="1" value="1" />
+        </label>
+        <button id="toggleModeBtn">Switch to Play Mode</button>
+        <button id="exportBtn">Export Puzzle JSON</button>
+        <button id="importBtn">Import Puzzle JSON</button>
+    </div>
+
+    <textarea id="jsonArea" placeholder="Paste puzzle JSON here for import"></textarea>
+
+    <div id="grid" aria-label="Puzzle grid"></div>
+
+    <script>
+        (() => {
+            let gridSize = 8;
+            let currentRegionId = 1;
+            let isPlayMode = false;
+            let puzzleGrid = []; // Holds region IDs or 0 for unassigned
+            let boardState = []; // '', 'X', or 'P' per cell in play mode
+
+            // Color mapping cache: regionId => color string
+            const regionColors = new Map();
+
+            function getColorForRegion(id) {
+                if (id === 0) return '#222'; // unassigned default dark
+                if (!regionColors.has(id)) {
+                    const goldenAngle = 137.508;
+                    const hue = (id * goldenAngle) % 360;
+                    regionColors.set(id, `hsl(${hue}, 70%, 60%)`);
+                }
+                return regionColors.get(id);
+            }
+
+            const gridEl = document.getElementById('grid');
+            const gridSizeInput = document.getElementById('gridSize');
+            const regionIdInput = document.getElementById('regionId');
+            const toggleModeBtn = document.getElementById('toggleModeBtn');
+            const exportBtn = document.getElementById('exportBtn');
+            const importBtn = document.getElementById('importBtn');
+            const jsonArea = document.getElementById('jsonArea');
+
+            function initGrid() {
+                puzzleGrid = Array.from({ length: gridSize }, () => Array(gridSize).fill(0));
+                boardState = Array.from({ length: gridSize }, () => Array(gridSize).fill(''));
+                renderGrid();
+            }
+
+            function renderGrid() {
+                gridEl.style.gridTemplateColumns = `repeat(${gridSize}, 40px)`;
+                gridEl.style.gridTemplateRows = `repeat(${gridSize}, 40px)`;
+                gridEl.innerHTML = '';
+
+                for (let r = 0; r < gridSize; r++) {
+                    for (let c = 0; c < gridSize; c++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+                        cell.dataset.r = r;
+                        cell.dataset.c = c;
+
+                        // background color from region
+                        cell.style.backgroundColor = getColorForRegion(puzzleGrid[r][c]);
+
+                        // show piece in play mode
+                        if (isPlayMode) {
+                            if (boardState[r][c] === 'X') {
+                                cell.textContent = 'X';
+                                cell.classList.add('X');
+                            } else if (boardState[r][c] === 'P') {
+                                cell.textContent = '🎃';
+                                cell.classList.add('P');
+                            } else {
+                                cell.textContent = '';
+                                cell.classList.remove('X', 'P');
+                            }
+                        } else {
+                            cell.textContent = puzzleGrid[r][c] === 0 ? '' : puzzleGrid[r][c];
+                            cell.classList.remove('X', 'P', 'invalid');
+                        }
+
+                        cell.addEventListener('click', () => onCellClick(r, c, cell));
+                        gridEl.appendChild(cell);
+                    }
+                }
+
+                if (isPlayMode) {
+                    validateBoard();
+                }
+            }
+
+            function onCellClick(r, c, cell) {
+                if (isPlayMode) {
+                    cyclePlayCell(r, c, cell);
+                } else {
+                    paintRegion(r, c);
+                }
+            }
+
+            function paintRegion(r, c) {
+                puzzleGrid[r][c] = currentRegionId;
+                renderGrid();
+            }
+
+            function cyclePlayCell(r, c, cell) {
+                const val = boardState[r][c];
+                if (val === '') {
+                    boardState[r][c] = 'X';
+                } else if (val === 'X') {
+                    boardState[r][c] = 'P';
+                } else {
+                    boardState[r][c] = '';
+                }
+                renderGrid();
+            }
+
+            // Validations for play mode:
+            // 1. No pumpkins (P) in same row
+            // 2. No pumpkins in same col
+            // 3. No pumpkins in same region (puzzleGrid)
+            // 4. No pumpkins adjacent (8 neighbors)
+            function validateBoard() {
+                // Clear invalids first
+                document.querySelectorAll('.cell').forEach(c => c.classList.remove('invalid'));
+
+                for (let r = 0; r < gridSize; r++) {
+                    for (let c = 0; c < gridSize; c++) {
+                        if (boardState[r][c] === 'P') {
+                            const region = puzzleGrid[r][c];
+                            const cellEl = document.querySelector(`.cell[data-r='${r}'][data-c='${c}']`);
+
+                            // Row and Col check
+                            for (let i = 0; i < gridSize; i++) {
+                                if (i !== c && boardState[r][i] === 'P') cellEl.classList.add('invalid');
+                                if (i !== r && boardState[i][c] === 'P') cellEl.classList.add('invalid');
+                            }
+
+                            // Region check
+                            for (let rr = 0; rr < gridSize; rr++) {
+                                for (let cc = 0; cc < gridSize; cc++) {
+                                    if ((rr !== r || cc !== c) && boardState[rr][cc] === 'P' && puzzleGrid[rr][cc] === region) {
+                                        cellEl.classList.add('invalid');
+                                    }
+                                }
+                            }
+
+                            // Adjacent 8 neighbors
+                            for (let dr = -1; dr <= 1; dr++) {
+                                for (let dc = -1; dc <= 1; dc++) {
+                                    if (dr === 0 && dc === 0) continue;
+                                    let nr = r + dr;
+                                    let nc = c + dc;
+                                    if (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize) {
+                                        if (boardState[nr][nc] === 'P') cellEl.classList.add('invalid');
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Export puzzleGrid as JSON string
+            function exportPuzzle() {
+                return JSON.stringify({ gridSize, puzzleGrid });
+            }
+
+            // Import puzzle JSON string
+            function importPuzzle(jsonStr) {
+                try {
+                    const obj = JSON.parse(jsonStr);
+                    if (typeof obj.gridSize !== 'number' || !Array.isArray(obj.puzzleGrid)) {
+                        alert('Invalid puzzle JSON');
+                        return;
+                    }
+                    gridSize = obj.gridSize;
+                    puzzleGrid = obj.puzzleGrid;
+                    boardState = Array.from({ length: gridSize }, () => Array(gridSize).fill(''));
+                    gridSizeInput.value = gridSize;
+                    regionIdInput.value = 1;
+                    isPlayMode = false;
+                    toggleModeBtn.textContent = 'Switch to Play Mode';
+                    regionColors.clear();
+                    renderGrid();
+                } catch (e) {
+                    alert('Invalid JSON');
+                }
+            }
+
+            // Event listeners
+            gridSizeInput.addEventListener('change', () => {
+                const val = +gridSizeInput.value;
+                if (val >= 4 && val <= 20) {
+                    gridSize = val;
+                    currentRegionId = 1;
+                    regionIdInput.value = 1;
+                    regionColors.clear();
+                    initGrid();
+                } else {
+                    alert('Grid size must be between 4 and 20');
+                    gridSizeInput.value = gridSize;
+                }
+            });
+
+            regionIdInput.addEventListener('change', () => {
+                const val = +regionIdInput.value;
+                if (val >= 1) {
+                    currentRegionId = val;
+                } else {
+                    regionIdInput.value = currentRegionId;
+                }
+            });
+
+            toggleModeBtn.addEventListener('click', () => {
+                isPlayMode = !isPlayMode;
+                if (isPlayMode) {
+                    toggleModeBtn.textContent = 'Switch to Create Mode';
+                    boardState = Array.from({ length: gridSize }, () => Array(gridSize).fill(''));
+                } else {
+                    toggleModeBtn.textContent = 'Switch to Play Mode';
+                }
+                renderGrid();
+            });
+
+            exportBtn.addEventListener('click', () => {
+                const json = exportPuzzle();
+                jsonArea.value = json;
+                jsonArea.select();
+                document.execCommand('copy');
+                alert('Puzzle JSON copied to clipboard');
+            });
+
+            importBtn.addEventListener('click', () => {
+                const json = jsonArea.value.trim();
+                if (json) importPuzzle(json);
+            });
+
+            // Initialize
+            initGrid();
+
+        })();
+    </script>
+
+</body>
+
+</html>
