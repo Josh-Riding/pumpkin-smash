@@ -155,6 +155,8 @@
 
             const regionColors = new Map();
 
+            let isDragging = false; // Track drag state
+
             function getColorForRegion(id) {
                 if (id === 0) return '#222';
                 if (!regionColors.has(id)) {
@@ -237,7 +239,9 @@
                             cell.classList.remove('X', 'P', 'invalid');
                         }
 
-                        cell.addEventListener('click', () => onCellClick(r, c, cell));
+                        cell.addEventListener('click', () => onCellClick(r, c));
+                        cell.addEventListener('mousedown', () => onDragStart(r, c));
+                        cell.addEventListener('mouseover', () => onDragOver(r, c));
                         gridEl.appendChild(cell);
                     }
                 }
@@ -247,20 +251,43 @@
                 }
             }
 
-            function onCellClick(r, c, cell) {
+            function onCellClick(r, c) {
                 if (isPlayMode) {
-                    cyclePlayCell(r, c, cell);
+                    cyclePlayCell(r, c);
                 } else {
                     paintRegion(r, c);
                 }
             }
+
+            function onDragStart(r, c) {
+                if (!isPlayMode) return;
+                isDragging = true;
+                paintXIfEmpty(r, c);
+            }
+
+            function onDragOver(r, c) {
+                if (!isPlayMode) return;
+                if (!isDragging) return;
+                paintXIfEmpty(r, c);
+            }
+
+            function paintXIfEmpty(r, c) {
+                if (boardState[r][c] === '') {
+                    boardState[r][c] = 'X';
+                    renderGrid();
+                }
+            }
+
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
 
             function paintRegion(r, c) {
                 puzzleGrid[r][c] = currentRegionId;
                 renderGrid();
             }
 
-            function cyclePlayCell(r, c, cell) {
+            function cyclePlayCell(r, c) {
                 const val = boardState[r][c];
                 if (val === '') {
                     boardState[r][c] = 'X';
@@ -382,8 +409,8 @@
             });
 
             initGrid();
-
         })();
+
     </script>
 
 </body>
