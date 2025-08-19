@@ -120,14 +120,21 @@
   }
 
   function onDragStart(r, c) {
-    if (!isPlayMode) return;
     isDragging = true;
-    paintXIfEmpty(r, c);
+    if (isPlayMode) {
+      paintXIfEmpty(r, c);
+    } else {
+      paintRegion(r, c);
+    }
   }
 
   function onDragOver(r, c) {
-    if (!isPlayMode || !isDragging) return;
-    paintXIfEmpty(r, c);
+    if (!isDragging) return;
+    if (isPlayMode) {
+      paintXIfEmpty(r, c);
+    } else {
+      paintRegion(r, c);
+    }
   }
 
   window.addEventListener("mouseup", () => {
@@ -142,8 +149,10 @@
   }
 
   function paintRegion(r, c) {
-    puzzleGrid[r][c] = currentRegionId;
-    renderGrid();
+    if (puzzleGrid[r][c] !== currentRegionId) {
+      puzzleGrid[r][c] = currentRegionId;
+      renderGrid();
+    }
   }
 
   function cyclePlayCell(r, c) {
