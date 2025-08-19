@@ -6,6 +6,7 @@
   let puzzleGrid = [];
   let boardState = [];
   let autoXMap = [];
+  let solvedShown = false;
 
   const regionColors = new Map();
   let isDragging = false;
@@ -108,7 +109,11 @@
       }
     }
 
-    if (isPlayMode) validateBoard();
+    if (isPlayMode) {
+      validateBoard();
+      if (isSolved()) showSolved();
+      else solvedShown = false; // Reset if not solved
+    }
   }
 
   function onCellClick(r, c) {
@@ -275,6 +280,84 @@
         }
       }
     }
+  }
+
+  function isSolved() {
+    // Check one pumpkin per row
+    for (let r = 0; r < gridSize; r++) {
+      let count = 0;
+      for (let c = 0; c < gridSize; c++) {
+        if (boardState[r][c] === "P") count++;
+      }
+      if (count !== 1) return false;
+    }
+    // Check one pumpkin per column
+    for (let c = 0; c < gridSize; c++) {
+      let count = 0;
+      for (let r = 0; r < gridSize; r++) {
+        if (boardState[r][c] === "P") count++;
+      }
+      if (count !== 1) return false;
+    }
+    // Check one pumpkin per region
+    const regionPumpkins = new Map();
+    for (let r = 0; r < gridSize; r++) {
+      for (let c = 0; c < gridSize; c++) {
+        if (boardState[r][c] === "P") {
+          const region = puzzleGrid[r][c];
+          if (!regionPumpkins.has(region)) regionPumpkins.set(region, 0);
+          regionPumpkins.set(region, regionPumpkins.get(region) + 1);
+        }
+      }
+    }
+    for (const [region, count] of regionPumpkins.entries()) {
+      if (region === 0) continue; // skip empty
+      if (count !== 1) return false;
+    }
+    // Check adjacency
+    for (let r = 0; r < gridSize; r++) {
+      for (let c = 0; c < gridSize; c++) {
+        if (boardState[r][c] === "P") {
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              if (dr === 0 && dc === 0) continue;
+              const nr = r + dr;
+              const nc = c + dc;
+              if (
+                nr >= 0 &&
+                nr < gridSize &&
+                nc >= 0 &&
+                nc < gridSize &&
+                boardState[nr][nc] === "P"
+              ) {
+                return false;
+              }
+            }
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+  function showSolved() {
+    if (solvedShown) return;
+    solvedShown = true;
+    // Simple confetti effect
+    const confetti = document.createElement("div");
+    confetti.textContent = "🎉🎃 SOLVED! 🎃🎉";
+    confetti.style.position = "fixed";
+    confetti.style.top = "40%";
+    confetti.style.left = "50%";
+    confetti.style.transform = "translate(-50%, -50%)";
+    confetti.style.fontSize = "2.5rem";
+    confetti.style.background = "rgba(0,0,0,0.7)";
+    confetti.style.color = "orange";
+    confetti.style.padding = "1em 2em";
+    confetti.style.borderRadius = "1em";
+    confetti.style.zIndex = "9999";
+    document.body.appendChild(confetti);
+    setTimeout(() => confetti.remove(), 3000);
   }
 
   function exportPuzzle() {
